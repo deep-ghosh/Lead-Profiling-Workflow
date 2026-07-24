@@ -34,7 +34,10 @@ class DevLeadDeliveryAdapter implements LeadDeliveryAdapter {
 // ---------------------------------------------------------------------------
 
 class WebhookLeadDeliveryAdapter implements LeadDeliveryAdapter {
-  constructor(private readonly webhookUrl: string) {}
+  constructor(
+    private readonly webhookUrl: string,
+    private readonly webhookSecret: string
+  ) {}
 
   async deliver(payload: LeadSubmissionPayload): Promise<LeadDeliveryResult> {
     const controller = new AbortController();
@@ -43,7 +46,10 @@ class WebhookLeadDeliveryAdapter implements LeadDeliveryAdapter {
     try {
       const response = await fetch(this.webhookUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-webhook-secret": this.webhookSecret,
+        },
         body: JSON.stringify(payload),
         signal: controller.signal,
       });
@@ -57,7 +63,7 @@ class WebhookLeadDeliveryAdapter implements LeadDeliveryAdapter {
 
       return { accepted: true, referenceId: payload.requestId };
     } catch (error) {
-      console.error("[WEBHOOK] Failed to deliver lead to n8n:", error);
+      console.error("[WEBHOOK] Failed to deliver lead to n8n: network or connection error");
       return { accepted: false, referenceId: payload.requestId };
     } finally {
       clearTimeout(timeoutId);
@@ -71,23 +77,23 @@ class WebhookLeadDeliveryAdapter implements LeadDeliveryAdapter {
 
 export function createLeadDeliveryAdapter(): LeadDeliveryAdapter {
   const webhookUrl = process.env.N8N_LEAD_WEBHOOK_URL;
+  const webhookSecret = process.env.N8N_WEBHOOK_SECRET;
 
-  if (webhookUrl) {
-    return new WebhookLeadDeliveryAdapter(webhookUrl);
-  }
-
-  // In production without a webhook configured, we should not silently succeed.
   const isProduction = process.env.NODE_ENV === "production";
-  if (isProduction) {
-    // Return an adapter that rejects — production must have webhook configured
-    return {
-      async deliver(payload: LeadSubmissionPayload): Promise<LeadDeliveryResult> {
-        console.error(
-          "[PRODUCTION] N8N_LEAD_WEBHOOK_URL is not configured. Cannot deliver lead."
-        );
-        return { accepted: false, referenceId: payload.requestId };
-      },
-    };
+  const isConfigured = !!(webhookUrl || webhookSecret);
+
+  if (isProduction || isConfigured) {
+    if (!webhookUrl || !webhookSecret) {
+      return {
+        async deliver(payload: LeadSubmissionPayload): Promise<LeadDeliveryResult> {
+          console.error(
+            "[ERROR] Lead delivery configuration error: Missing environment variables."
+          );
+          return { accepted: false, referenceId: payload.requestId };
+        },
+      };
+    }
+    return new WebhookLeadDeliveryAdapter(webhookUrl, webhookSecret);
   }
 
   return new DevLeadDeliveryAdapter();
