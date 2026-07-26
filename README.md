@@ -1,4 +1,4 @@
-# Eubrics AI Lead Automation
+# Lead Automation
 
 A Next.js application for capturing business inquiries and routing qualified leads to the appropriate Eubrics specialist through n8n.
 
