@@ -15,103 +15,21 @@ A Next.js application for capturing business inquiries and routing qualified lea
 
 ## Internal Flow
 
-### 1. Session context
-
-`SectionTracker` observes the main solution and contact sections. A section is
-recorded only after at least 50% of it has been visible for two seconds. Time is
-paused while the browser tab is hidden, repeated visits are merged, and only
-five visits are retained in `sessionStorage`.
-
-The first landing page, referrer, and available UTM parameters are also
-captured as first-party session context. No tracking request is sent while the
-visitor is browsing. Journey data is attached only when the form is submitted;
-the current payload builder reads attribution from the active page URL at that
-time.
-
-### 2. Form and payload construction
-
-The first form step collects the visitor's name, work email, and company. The
-second collects the business challenge, optional role, company size and phone,
-plus explicit contact consent. A draft is kept in `sessionStorage` for error
-recovery, but the honeypot value and consent are never restored.
-
-Before submission, the client:
-
-- validates each step with the shared Zod rules;
-- normalizes whitespace, email casing, and phone characters;
-- removes empty optional fields;
-- merges duplicate journey entries and limits the journey to five items;
-- assigns a session ID and a request ID; and
-- reuses the same request ID if the visitor retries a failed request.
-
-The resulting request has this shape:
-
-```json
-{
-  "schemaVersion": "1.0",
-  "requestId": "lead_<uuid>",
-  "submittedAt": "<ISO timestamp>",
-  "source": "website-lead-form",
-  "visitor": {
-    "fullName": "Jane Smith",
-    "email": "jane@company.com",
-    "company": "Acme Corp",
-    "jobRole": "Head of Sales",
-    "phone": "+1 555 123 4567",
-    "companySize": "51–200"
-  },
-  "inquiry": {
-    "message": "We want to improve sales qualification and follow-up."
-  },
-  "journey": {
-    "sessionId": "sess_<uuid>",
-    "landingPage": "/",
-    "pageVisits": [
-      {
-        "path": "/sales-bots",
-        "title": "AI Sales Bots",
-        "visitedAt": "<ISO timestamp>",
-        "durationSeconds": 18
-      }
-    ]
-  },
-  "attribution": {
-    "referrer": "https://example.com/",
-    "utmSource": "linkedin",
-    "utmMedium": "social",
-    "utmCampaign": "spring"
-  },
-  "consent": {
-    "contactAllowed": true
-  }
-}
-```
-
-Optional visitor and attribution fields may be absent.
-
-### 3. API validation and safeguards
-
-The browser sends the payload to `POST /api/leads` as JSON and stops waiting
-after 15 seconds. The API accepts JSON only, rejects bodies larger than 50 KB,
-parses the body safely, and validates the full payload again on the server.
-The form also includes a honeypot and a short client-side submission cooldown.
-Validation details are returned to the form, while unexpected internal errors
-are logged on the server and replaced with a generic browser-safe message.
-
-### 4. n8n delivery and response
-
-The server-side delivery adapter sends the validated payload to
-`N8N_LEAD_WEBHOOK_URL` with `N8N_WEBHOOK_SECRET` in the
-`x-webhook-secret` header. The webhook request has a 10-second timeout. A
-successful 2xx response produces a success result and reference ID; a timeout,
-network error, or non-2xx response produces a retryable `503` response.
-
-This repository owns capture, validation, and secure delivery. The configured
-n8n workflow is expected to own downstream operations such as authenticating
-the webhook, deduplicating by `requestId`, qualifying the inquiry, routing it to
-the appropriate specialist, and triggering any CRM or notification actions.
-The exact n8n node flow is not stored in this repository and should be
-documented alongside the exported n8n workflow when one is added.
+1. **Session tracking:** Meaningful section visits, the landing page, and
+   attribution data are stored in `sessionStorage`. Section visits require at
+   least 50% visibility for two seconds and are limited to five entries.
+2. **Form processing:** The two-step form collects visitor and inquiry details.
+   The client validates and normalizes the data, excludes empty optional fields,
+   and adds journey and request metadata. Draft consent is never restored.
+3. **API validation:** `POST /api/leads` accepts JSON requests up to 50 KB and
+   validates the complete payload on the server. A honeypot, submission
+   cooldown, safe error responses, and request timeouts provide additional
+   safeguards.
+4. **n8n delivery:** Validated leads are sent to the configured webhook using
+   the secret header. Successful delivery returns a reference ID; failed or
+   timed-out delivery returns `503`. Qualification, specialist routing, and
+   downstream CRM or notification actions remain the responsibility of the
+   n8n workflow.
 
 ## Local Setup
 
