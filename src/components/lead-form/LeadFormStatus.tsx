@@ -68,8 +68,8 @@ export function LeadFormSuccess({ onReset }: LeadFormSuccessProps) {
       <button
         type="button"
         onClick={onReset}
-        className="btn-secondary"
-        style={{ marginTop: "1rem", padding: "0.625rem 1.25rem", color: "var(--text-inverse)", borderColor: "var(--border-dark)" }}
+        className="btn-secondary btn-secondary-dark"
+        style={{ marginTop: "1rem", padding: "0.625rem 1.25rem" }}
       >
         Submit another request
       </button>

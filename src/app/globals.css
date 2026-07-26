@@ -281,6 +281,23 @@ section {
   background: var(--border-light);
 }
 
+.btn-secondary-dark {
+  color: var(--text-inverse);
+  border-color: var(--border-dark);
+}
+
+.btn-secondary-dark:hover,
+.btn-secondary-dark:focus-visible {
+  color: var(--text-inverse);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.28);
+  outline-color: var(--brand-400);
+}
+
+.btn-secondary-dark:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .btn-link {
   display: inline-flex;
   align-items: center;
